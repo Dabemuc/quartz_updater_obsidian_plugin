@@ -1,0 +1,1 @@
+# quartz_updater_obsidian_plugin
