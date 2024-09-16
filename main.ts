@@ -7,16 +7,26 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  TFile,
 } from "obsidian";
+import { createHash } from "crypto";
+import {
+  Manifest,
+  requestUpdateRequestBody,
+  requestUpdateResponseBody,
+  Update,
+  updateBatchRequestBody,
+  updateSession,
+} from "types";
 
-// Remember to rename these classes and interfaces!
-
+// TODO
 interface MyPluginSettings {
-  mySetting: string;
+  backendUrl: string;
 }
 
+// TODO
 const DEFAULT_SETTINGS: MyPluginSettings = {
-  mySetting: "default",
+  backendUrl: "",
 };
 
 export default class MyPlugin extends Plugin {
@@ -25,73 +35,33 @@ export default class MyPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    // TODO use to open modal with sync button and then sync status
     // This creates an icon in the left ribbon.
     const ribbonIconEl = this.addRibbonIcon(
-      "dice",
-      "Sample Plugin",
+      "folder-sync",
+      "Quartz Sync",
       (evt: MouseEvent) => {
         // Called when the user clicks the icon.
-        new Notice("This is a notice!");
+        new SyncModal(this.app, this.settings).open();
       }
     );
+
+    // TODO: Use for styling?
     // Perform additional things with the ribbon
     ribbonIconEl.addClass("my-plugin-ribbon-class");
 
-    // This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-    const statusBarItemEl = this.addStatusBarItem();
-    statusBarItemEl.setText("Status Bar Text");
-
+    // TODO: Same as left ribbon icon
     // This adds a simple command that can be triggered anywhere
     this.addCommand({
-      id: "open-sample-modal-simple",
-      name: "Open sample modal (simple)",
+      id: "open-quartz-sync-modal",
+      name: "Open quartz sync modal",
       callback: () => {
-        new SampleModal(this.app).open();
-      },
-    });
-    // This adds an editor command that can perform some operation on the current editor instance
-    this.addCommand({
-      id: "sample-editor-command",
-      name: "Sample editor command",
-      editorCallback: (editor: Editor, view: MarkdownView) => {
-        console.log(editor.getSelection());
-        editor.replaceSelection("Sample Editor Command");
-      },
-    });
-    // This adds a complex command that can check whether the current state of the app allows execution of the command
-    this.addCommand({
-      id: "open-sample-modal-complex",
-      name: "Open sample modal (complex)",
-      checkCallback: (checking: boolean) => {
-        // Conditions to check
-        const markdownView =
-          this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (markdownView) {
-          // If checking is true, we're simply "checking" if the command can be run.
-          // If checking is false, then we want to actually perform the operation.
-          if (!checking) {
-            new SampleModal(this.app).open();
-          }
-
-          // This command will only show up in Command Palette when the check function returns true
-          return true;
-        }
+        new SyncModal(this.app, this.settings).open();
       },
     });
 
     // This adds a settings tab so the user can configure various aspects of the plugin
     this.addSettingTab(new SampleSettingTab(this.app, this));
-
-    // If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-    // Using this function will automatically remove the event listener when this plugin is disabled.
-    this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-      console.log("click", evt);
-    });
-
-    // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-    this.registerInterval(
-      window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000)
-    );
   }
 
   onunload() {}
@@ -105,14 +75,184 @@ export default class MyPlugin extends Plugin {
   }
 }
 
-class SampleModal extends Modal {
-  constructor(app: App) {
+type SyncState =
+  | "not-started"
+  | "started"
+  | "manifest-built"
+  | "manifest-sent"
+  | "update-sessions-received"
+  | "results-received"
+  | "error";
+
+let state: SyncState = "not-started";
+let error: string = "";
+let results: string = "";
+
+class SyncModal extends Modal {
+  settings: MyPluginSettings;
+
+  constructor(app: App, settings: MyPluginSettings) {
     super(app);
+    this.settings = settings;
   }
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.setText("Woah!");
+    // create main div with class for styling
+    const div = contentEl.createDiv("quartz-sync-modal");
+    div.createEl("h2", { text: "Quartz Sync" });
+    div.createEl("p", {
+      text: "This will attempt to sync all files marked with the quartz-sync=true frontmatter to the configured quartz_updater backend.",
+    });
+    const button = div.createEl("button", { text: "Start sync" });
+    button.addEventListener("click", this.handleSync.bind(this));
+    div.createEl("h3", { text: "Sync status:" });
+    const status = div.createEl("p", { text: state });
+    this.startStatusUpdate(status);
+  }
+
+  async handleSync() {
+    // Start sync
+    state = "started";
+
+    try {
+      // Validate settings
+      if (!this.settings.backendUrl || this.settings.backendUrl === "") {
+        throw new Error("Backend URL is not set");
+      }
+
+      // Get all markdown files with frontmatter quartz-sync=true
+      const files = this.app.vault.getMarkdownFiles().filter((file) => {
+        const frontmatter =
+          this.app.metadataCache.getFileCache(file)?.frontmatter;
+        return frontmatter && frontmatter["quartz-sync"] === true;
+      });
+
+      // Build manifest
+      const manifest: Manifest = await Promise.all(
+        files.map(async (file) => {
+          const fileReadable = this.app.vault.getAbstractFileByPath(file.path)!;
+          if (fileReadable instanceof TFile === false) {
+            throw new Error(`File ${file.path} could not be read`);
+          }
+          return {
+            path: file.path,
+            hash: this.hashContent(await this.app.vault.read(fileReadable)),
+          };
+        })
+      );
+      state = "manifest-built";
+
+      // Send manifest
+      const response = await fetch(this.settings.backendUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ manifest } satisfies requestUpdateRequestBody),
+      });
+      state = "manifest-sent";
+
+      // Wait for update sessions
+      const responseJson = await response.json();
+
+      // Validate response
+      if (response.status !== 200) {
+        throw new Error("An Error occurred while sending the manifest");
+      }
+      if (!responseJson.body || !responseJson.body.updateSessions) {
+        throw new Error("Invalid response from backend");
+      }
+      const updateSessions: updateSession[] = responseJson.body.updateSessions;
+      if (!Array.isArray(updateSessions)) {
+        throw new Error("Invalid response from backend");
+      }
+      state = "update-sessions-received";
+
+      // Send updates
+      await Promise.all(
+        updateSessions.map(async (session) => {
+          // Generate updates
+          const updates: Update[] = await Promise.all(
+            session.permittedChanges.map(async (change) => {
+              const fileReadable = this.app.vault.getAbstractFileByPath(
+                change.path
+              )!;
+              if (fileReadable instanceof TFile === false) {
+                throw new Error(`File ${change.path} could not be read`);
+              }
+              return {
+                type: change.type,
+                path: change.path,
+                content: await this.app.vault.read(fileReadable),
+              };
+            })
+          );
+
+          // Send updates
+          const response = await fetch(this.settings.backendUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              id: session.id,
+              updates,
+            } satisfies updateBatchRequestBody),
+          });
+
+          // Validate response
+          if (response.status !== 200) {
+            throw new Error("An Error occurred while sending updates");
+          }
+          const responseJson = await response.json();
+          const sessionResult = responseJson.body;
+          if (!Array.isArray(sessionResult)) {
+            throw new Error("Invalid response from backend");
+          }
+
+          // Update results
+          sessionResult.forEach((result) => {
+            results += `${result.path}: ${result.status}\n`;
+          });
+        })
+      );
+      state = "results-received";
+    } catch (e) {
+      error = e.message;
+      state = "error";
+    }
+  }
+
+  // Helper function to calculate the hash of file content
+  hashContent = (content: string): string =>
+    createHash("sha256").update(content).digest("hex");
+
+  async startStatusUpdate(statusEl: HTMLElement) {
+    const interval = setInterval(() => {
+      statusEl.innerText = state;
+      switch (state) {
+        case "started":
+          statusEl.innerText = "Sending manifest";
+          break;
+        case "manifest-sent":
+          statusEl.innerText = "Waiting for update sessions";
+          break;
+        case "update-sessions-received":
+          statusEl.innerText = results;
+          break;
+        case "results-received":
+          statusEl.innerText = results;
+          statusEl.style.color = "green";
+          clearInterval(interval);
+          break;
+        case "error":
+          statusEl.innerText = error;
+          statusEl.style.color = "red";
+          clearInterval(interval);
+          break;
+      }
+    }, 1000);
   }
 
   onClose() {
@@ -135,14 +275,14 @@ class SampleSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("Setting #1")
-      .setDesc("It's a secret")
+      .setName("Backend URL")
+      .setDesc("URL of the quartz_updater backend")
       .addText((text) =>
         text
-          .setPlaceholder("Enter your secret")
-          .setValue(this.plugin.settings.mySetting)
+          .setPlaceholder("Required!")
+          .setValue(this.plugin.settings.backendUrl)
           .onChange(async (value) => {
-            this.plugin.settings.mySetting = value;
+            this.plugin.settings.backendUrl = value;
             await this.plugin.saveSettings();
           })
       );
