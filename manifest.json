@@ -1,0 +1,11 @@
+{
+  "id": "quartz_updater_obsidian_plugin",
+  "name": "Quartz Updater",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "",
+  "author": "Dabemuc",
+  "authorUrl": "https://github.com/Dabemuc",
+  "fundingUrl": "",
+  "isDesktopOnly": false
+}
