@@ -19,6 +19,7 @@ import {
   updateSession,
 } from "types";
 import { assert } from "console";
+import * as path from "path";
 
 // TODO
 interface MyPluginSettings {
@@ -145,7 +146,7 @@ class SyncModal extends Modal {
       state = "manifest-built";
 
       // Send manifest
-      const response = await fetch(this.settings.backendUrl, {
+      const response = await fetch(path.join(this.settings.backendUrl, "/request-update"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -191,7 +192,7 @@ class SyncModal extends Modal {
           );
 
           // Send updates
-          const response = await fetch(this.settings.backendUrl, {
+          const response = await fetch(path.join(this.settings.backendUrl, "/update-batch"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
