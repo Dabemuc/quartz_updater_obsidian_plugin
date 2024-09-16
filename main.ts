@@ -222,7 +222,7 @@ class SyncModal extends Modal {
       );
       state = "results-received";
     } catch (e) {
-      error = e.message;
+      error = JSON.stringify(e);
       state = "error";
     }
   }
