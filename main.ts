@@ -18,8 +18,6 @@ import {
   updateBatchRequestBody,
   updateSession,
 } from "types";
-import { assert } from "console";
-import * as path from "path";
 
 // TODO
 interface MyPluginSettings {
@@ -73,6 +71,9 @@ export default class MyPlugin extends Plugin {
   }
 
   async saveSettings() {
+    if(this.settings.backendUrl.endsWith("/")) {
+      this.settings.backendUrl = this.settings.backendUrl.slice(0, -1);
+    }
     await this.saveData(this.settings);
   }
 }
@@ -146,7 +147,7 @@ class SyncModal extends Modal {
       state = "manifest-built";
 
       // Send manifest
-      const response = await fetch(path.join(this.settings.backendUrl, "/request-update"), {
+      const response = await fetch(this.settings.backendUrl + "/request-update", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -192,7 +193,7 @@ class SyncModal extends Modal {
           );
 
           // Send updates
-          const response = await fetch(path.join(this.settings.backendUrl, "/update-batch"), {
+          const response = await fetch(this.settings.backendUrl + "/update-batch", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
