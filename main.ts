@@ -18,6 +18,7 @@ import {
   updateBatchRequestBody,
   updateSession,
 } from "types";
+import { assert } from "console";
 
 // TODO
 interface MyPluginSettings {
@@ -137,7 +138,7 @@ class SyncModal extends Modal {
           }
           return {
             path: file.path,
-            hash: this.hashContent(await this.app.vault.read(fileReadable)),
+            hash: this.hashContent(await this.app.vault.read(fileReadable as TFile)),
           };
         })
       );
@@ -149,7 +150,7 @@ class SyncModal extends Modal {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ manifest } satisfies requestUpdateRequestBody),
+        body: JSON.stringify({ manifest }),
       });
       state = "manifest-sent";
 
@@ -184,7 +185,7 @@ class SyncModal extends Modal {
               return {
                 type: change.type,
                 path: change.path,
-                content: await this.app.vault.read(fileReadable),
+                content: await this.app.vault.read(fileReadable as TFile),
               };
             })
           );
@@ -198,7 +199,7 @@ class SyncModal extends Modal {
             body: JSON.stringify({
               id: session.id,
               updates,
-            } satisfies updateBatchRequestBody),
+            }),
           });
 
           // Validate response
