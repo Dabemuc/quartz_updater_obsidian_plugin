@@ -112,15 +112,16 @@ class SyncModal extends Modal {
     div.createEl("h3", { text: "Sync status:" });
     const status = div.createEl("p", { text: state });
 
+    this.startStatusUpdate(status, button);
+  }
+
+  async handleSync() {
     // Start sync
     error = "";
     results = "";
     state = "started";
 
-    this.startStatusUpdate(status, button);
-  }
 
-  async handleSync() {
     try {
       // Validate settings
       if (!this.settings.backendUrl || this.settings.backendUrl === "") {
