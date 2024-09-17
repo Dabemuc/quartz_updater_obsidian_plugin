@@ -108,19 +108,20 @@ class SyncModal extends Modal {
       text: "This will attempt to sync all files marked with the quartz-sync=true frontmatter to the configured quartz_updater backend.",
     });
     const button = div.createEl("button", { text: "Start sync"});
-    button.addEventListener("click", this.handleSync.bind(this));
-    div.createEl("h3", { text: "Sync status:" });
     const status = div.createEl("p", { text: state });
-
-    this.startStatusUpdate(status, button);
+    
+    button.addEventListener("click", () => this.handleSync(status, button));
+    div.createEl("h3", { text: "Sync status:" });
   }
 
-  async handleSync() {
+  async handleSync(status: HTMLElement, button: HTMLElement) {
+    // Start updater
+    this.startStatusUpdate(status, button);
+
     // Start sync
     error = "";
     results = "";
     state = "started";
-
 
     try {
       // Validate settings
@@ -157,8 +158,10 @@ class SyncModal extends Modal {
         this.settings.backendUrl + "/request-update",
         {
           method: "POST",
+          mode: "cors",
           headers: {
-            "Content-Type": "application/json",
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ manifest }),
         }
