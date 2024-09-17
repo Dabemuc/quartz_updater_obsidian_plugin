@@ -71,7 +71,7 @@ export default class MyPlugin extends Plugin {
   }
 
   async saveSettings() {
-    if(this.settings.backendUrl.endsWith("/")) {
+    if (this.settings.backendUrl.endsWith("/")) {
       this.settings.backendUrl = this.settings.backendUrl.slice(0, -1);
     }
     await this.saveData(this.settings);
@@ -107,17 +107,20 @@ class SyncModal extends Modal {
     div.createEl("p", {
       text: "This will attempt to sync all files marked with the quartz-sync=true frontmatter to the configured quartz_updater backend.",
     });
-    const button = div.createEl("button", { text: "Start sync" });
+    const button = div.createEl("button", { text: "Start sync"});
     button.addEventListener("click", this.handleSync.bind(this));
     div.createEl("h3", { text: "Sync status:" });
     const status = div.createEl("p", { text: state });
-    this.startStatusUpdate(status);
+
+    // Start sync
+    error = "";
+    results = "";
+    state = "started";
+
+    this.startStatusUpdate(status, button);
   }
 
   async handleSync() {
-    // Start sync
-    state = "started";
-
     try {
       // Validate settings
       if (!this.settings.backendUrl || this.settings.backendUrl === "") {
@@ -140,20 +143,25 @@ class SyncModal extends Modal {
           }
           return {
             path: file.path,
-            hash: this.hashContent(await this.app.vault.read(fileReadable as TFile)),
+            hash: this.hashContent(
+              await this.app.vault.read(fileReadable as TFile)
+            ),
           };
         })
       );
       state = "manifest-built";
 
       // Send manifest
-      const response = await fetch(this.settings.backendUrl + "/request-update", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ manifest }),
-      });
+      const response = await fetch(
+        this.settings.backendUrl + "/request-update",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ manifest }),
+        }
+      );
       state = "manifest-sent";
 
       // Wait for update sessions
@@ -193,16 +201,19 @@ class SyncModal extends Modal {
           );
 
           // Send updates
-          const response = await fetch(this.settings.backendUrl + "/update-batch", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              id: session.id,
-              updates,
-            }),
-          });
+          const response = await fetch(
+            this.settings.backendUrl + "/update-batch",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                id: session.id,
+                updates,
+              }),
+            }
+          );
 
           // Validate response
           if (response.status !== 200) {
@@ -222,7 +233,7 @@ class SyncModal extends Modal {
       );
       state = "results-received";
     } catch (e) {
-      error = JSON.stringify(e);
+      error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`; 
       state = "error";
     }
   }
@@ -231,12 +242,14 @@ class SyncModal extends Modal {
   hashContent = (content: string): string =>
     createHash("sha256").update(content).digest("hex");
 
-  async startStatusUpdate(statusEl: HTMLElement) {
+  async startStatusUpdate(statusEl: HTMLElement, button: HTMLElement) {
     const interval = setInterval(() => {
       statusEl.innerText = state;
       switch (state) {
         case "started":
           statusEl.innerText = "Sending manifest";
+          button.setAttribute("disabled", "true");
+          button.innerText = "Syncing...";
           break;
         case "manifest-sent":
           statusEl.innerText = "Waiting for update sessions";
@@ -248,11 +261,15 @@ class SyncModal extends Modal {
           statusEl.innerText = results;
           statusEl.style.color = "green";
           clearInterval(interval);
+          button.removeAttribute("disabled");
+          button.innerText = "Restart sync";
           break;
         case "error":
           statusEl.innerText = error;
           statusEl.style.color = "red";
           clearInterval(interval);
+          button.removeAttribute("disabled");
+          button.innerText = "Restart sync";
           break;
       }
     }, 1000);
