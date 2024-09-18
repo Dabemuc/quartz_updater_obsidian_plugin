@@ -31,7 +31,7 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 };
 
 export default class MyPlugin extends Plugin {
-  settings: MyPluginSettings = DEFAULT_SETTINGS;
+  settings: MyPluginSettings;
 
   async onload() {
     await this.loadSettings();
@@ -141,7 +141,7 @@ class SyncModal extends Modal {
 
       // Build manifest
       const manifest: Manifest = files.map((file) => {
-          const fullPath = path.join(__dirname, file.path);
+          const fullPath = path.join(process.cwd(), file.path);
           generatedClientManifestEl.innerText += `\n Building manifest for ${fullPath}`;
           // const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
           // generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
