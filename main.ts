@@ -20,6 +20,7 @@ import {
 } from "types";
 import { inspect } from "util";
 import { join } from 'path';
+import { readFileSync } from 'fs';
 
 interface MyPluginSettings {
   backendUrl: string;
@@ -142,16 +143,19 @@ class SyncModal extends Modal {
       const manifest: Manifest = await Promise.all(
         files.map(async (file) => {
           generatedClientManifestEl.innerText += `\n Building manifest for ${file.path}`;
-          const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
-          generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
-          if (!fileReadable || fileReadable instanceof TFile === false) {
-            throw new Error(`File ${file.path} could not be read`);
-          }
-          generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(fileReadable as TFile)}`;
+          // const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
+          // generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
+          // if (!fileReadable || fileReadable instanceof TFile === false) {
+          //   throw new Error(`File ${file.path} could not be read`);
+          // }
+          // generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(fileReadable as TFile)}`;
+          const content = readFileSync(join(__dirname, file.path), 'utf-8');
+          generatedClientManifestEl.innerText += `\n File content: \n ${content}`;
           return {
             path: file.path,
             hash: this.hashContent(
-              await this.app.vault.read(fileReadable as TFile)
+              // await this.app.vault.read(fileReadable as TFile)
+              content
             ),
           };
         })
