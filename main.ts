@@ -19,8 +19,8 @@ import {
   updateSession,
 } from "types";
 import { inspect } from "util";
-import { join } from 'path';
-import { readFileSync } from 'fs';
+import * as path from 'path';
+import * as fs from 'fs';
 
 interface MyPluginSettings {
   backendUrl: string;
@@ -141,7 +141,7 @@ class SyncModal extends Modal {
 
       // Build manifest
       const manifest: Manifest = files.map((file) => {
-          const fullPath = join(__dirname, file.path);
+          const fullPath = path.join(__dirname, file.path);
           generatedClientManifestEl.innerText += `\n Building manifest for ${fullPath}`;
           // const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
           // generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
@@ -149,7 +149,7 @@ class SyncModal extends Modal {
           //   throw new Error(`File ${file.path} could not be read`);
           // }
           // generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(fileReadable as TFile)}`;
-          const content = readFileSync(fullPath, 'utf-8').toString();
+          const content = fs.readFileSync(fullPath, 'utf-8').toString();
           generatedClientManifestEl.innerText += `\n File content: \n ${content}`;
           const hash = this.hashContent(content);
           return {
