@@ -18,6 +18,7 @@ import {
   updateBatchRequestBody,
   updateSession,
 } from "types";
+import { inspect } from "util";
 
 interface MyPluginSettings {
   backendUrl: string;
@@ -141,7 +142,7 @@ class SyncModal extends Modal {
         files.map(async (file) => {
           generatedClientManifestEl.innerText += `\n Building manifest for ${file.path}`;
           const fileReadable = this.app.vault.getAbstractFileByPath(file.path)!;
-          generatedClientManifestEl.innerText += `\n FileReadable: \n ${JSON.stringify(fileReadable)}`;
+          generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
           if (!fileReadable || fileReadable instanceof TFile === false) {
             throw new Error(`File ${file.path} could not be read`);
           }
