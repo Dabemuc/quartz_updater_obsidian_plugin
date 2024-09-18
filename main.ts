@@ -17,7 +17,7 @@ import {
   Update,
   updateBatchRequestBody,
   updateSession,
-} from "types";
+} from "./types";
 import { inspect } from "util";
 import * as path from 'path';
 import * as fs from 'fs';
@@ -31,7 +31,7 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 };
 
 export default class MyPlugin extends Plugin {
-  settings: MyPluginSettings;
+  settings: MyPluginSettings = DEFAULT_SETTINGS;
 
   async onload() {
     await this.loadSettings();
@@ -250,7 +250,7 @@ class SyncModal extends Modal {
         })
       );
       state = "results-received";
-    } catch (e) {
+    } catch (e: any) {
       error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`; 
       state = "error";
     }
