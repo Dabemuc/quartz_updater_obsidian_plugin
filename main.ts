@@ -130,15 +130,11 @@ class SyncModal extends Modal {
       }
 
       // Get all markdown files with frontmatter quartz-sync=true
-      generatedClientManifestEl.innerText += "All files found by getMarkdownFiles: \n" + this.app.vault.getMarkdownFiles().map((file) => file.path).join("\n");
-      generatedClientManifestEl.innerText += "All files found by getFiles\n" + this.app.vault.getFiles().map((file) => file.path).join("\n");
-      const files = this.app.vault.getMarkdownFiles().filter((file) => {
+      const files = this.app.vault.getFiles().filter((file) => {
         const frontmatter =
           this.app.metadataCache.getFileCache(file)?.frontmatter;
-        generatedClientManifestEl.innerText += `\n Frontmatter for File ${file.path}: \n ${JSON.stringify(frontmatter)}`;
-        return frontmatter && frontmatter["quartz-sync"] === true;
+        return frontmatter && frontmatter["quartz-sync"] === "true";
       });
-      generatedClientManifestEl.innerText += `\n Files to sync: \n ${files.map((file) => file.path).join("\n")}`;
 
       // Build manifest
       const manifest: Manifest = await Promise.all(
