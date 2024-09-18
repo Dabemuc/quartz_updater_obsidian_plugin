@@ -193,7 +193,7 @@ class SyncModal extends Modal {
       if (!response.body || !responseJson.updateSessions) {
         throw new Error("Response body is invalid");
       }
-      const updateSessions: updateSession[] = responseJson.body.updateSessions;
+      const updateSessions: updateSession[] = responseJson.updateSessions;
       if (!Array.isArray(updateSessions)) {
         throw new Error("Update sessions not found in response body");
       }
