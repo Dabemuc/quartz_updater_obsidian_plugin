@@ -184,13 +184,13 @@ class SyncModal extends Modal {
 
       // Wait for update sessions
       const responseJson = await response.json();
-      serverResponseEl.innerText = JSON.stringify(responseJson);
+      serverResponseEl.innerText = JSON.stringify(response);
 
       // Validate response
       if (response.status !== 200) {
         throw new Error("An Error occurred while sending the manifest");
       }
-      if (!responseJson.body || !responseJson.body.updateSessions) {
+      if (!response.body || !responseJson.updateSessions) {
         throw new Error("Response body is invalid");
       }
       const updateSessions: updateSession[] = responseJson.body.updateSessions;
