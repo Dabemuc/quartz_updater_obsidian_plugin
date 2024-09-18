@@ -90,6 +90,7 @@ type SyncState =
 let state: SyncState = "not-started";
 let error: string = "";
 let results: string = "";
+let serverResponse: string = "";
 
 class SyncModal extends Modal {
   settings: MyPluginSettings;
@@ -108,13 +109,14 @@ class SyncModal extends Modal {
       text: "This will attempt to sync all files marked with the quartz-sync=true frontmatter to the configured quartz_updater backend.",
     });
     const button = div.createEl("button", { text: "Start sync"});
-    const status = div.createEl("p", { text: state });
-    
-    button.addEventListener("click", () => this.handleSync(status, button));
     div.createEl("h3", { text: "Sync status:" });
+    const status = div.createEl("p", { text: state });
+    const serverResponseEl = div.createEl("p", { text: serverResponse });
+    
+    button.addEventListener("click", () => this.handleSync(status, button, serverResponseEl));
   }
 
-  async handleSync(status: HTMLElement, button: HTMLElement) {
+  async handleSync(status: HTMLElement, button: HTMLElement, serverResponseEl: HTMLElement) {
     // Start updater
     this.startStatusUpdate(status, button);
 
@@ -170,21 +172,23 @@ class SyncModal extends Modal {
 
       // Wait for update sessions
       const responseJson = await response.json();
+      serverResponseEl.innerText = JSON.stringify(responseJson);
 
       // Validate response
       if (response.status !== 200) {
         throw new Error("An Error occurred while sending the manifest");
       }
       if (!responseJson.body || !responseJson.body.updateSessions) {
-        throw new Error("Invalid response from backend");
+        throw new Error("Response body is invalid");
       }
       const updateSessions: updateSession[] = responseJson.body.updateSessions;
       if (!Array.isArray(updateSessions)) {
-        throw new Error("Invalid response from backend");
+        throw new Error("Update sessions not found in response body");
       }
       state = "update-sessions-received";
 
       // Send updates
+      serverResponseEl.innerText = "";
       await Promise.all(
         updateSessions.map(async (session) => {
           // Generate updates
@@ -218,6 +222,7 @@ class SyncModal extends Modal {
               }),
             }
           );
+          serverResponseEl.innerText = serverResponseEl.innerText + "\n" + session.id + ": \n" + JSON.stringify(await response.json());
 
           // Validate response
           if (response.status !== 200) {
@@ -226,7 +231,7 @@ class SyncModal extends Modal {
           const responseJson = await response.json();
           const sessionResult = responseJson.body;
           if (!Array.isArray(sessionResult)) {
-            throw new Error("Invalid response from backend");
+            throw new Error("Invalid response body");
           }
 
           // Update results
