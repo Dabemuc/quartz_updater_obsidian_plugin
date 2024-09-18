@@ -141,7 +141,7 @@ class SyncModal extends Modal {
 
       // Build manifest
       const manifest: Manifest = files.map((file) => {
-          const fullPath = path.join(process.cwd(), file.path);
+          const fullPath = path.join(this.app.vault.getRoot().path, file.path);
           generatedClientManifestEl.innerText += `\n Building manifest for ${fullPath}`;
           // const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
           // generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
