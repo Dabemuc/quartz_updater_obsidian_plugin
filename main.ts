@@ -34,6 +34,11 @@ export default class MyPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    // This adds a settings tab so the user can configure various aspects of the plugin
+    this.addSettingTab(new SampleSettingTab(this.app, this));
+  }
+
+  onLayoutReady() {
     // This creates an icon in the left ribbon.
     const ribbonIconEl = this.addRibbonIcon(
       "folder-sync",
@@ -56,9 +61,6 @@ export default class MyPlugin extends Plugin {
         new SyncModal(this.app, this.settings).open();
       },
     });
-
-    // This adds a settings tab so the user can configure various aspects of the plugin
-    this.addSettingTab(new SampleSettingTab(this.app, this));
   }
 
   onunload() {}
@@ -104,18 +106,30 @@ class SyncModal extends Modal {
     div.createEl("p", {
       text: "This will attempt to sync all files marked with the quartz-sync=true frontmatter to the configured quartz_updater backend.",
     });
-    const button = div.createEl("button", { text: "Start sync"});
+    const button = div.createEl("button", { text: "Start sync" });
     div.createEl("h3", { text: "Sync status:" });
     const statusEl = div.createEl("p", { text: state });
     div.createEl("h3", { text: "Client manifest generated:" });
     const generatedClientManifestEl = div.createEl("p", { text: "..." });
     div.createEl("h3", { text: "Server response:" });
     const serverResponseEl = div.createEl("p", { text: "..." });
-    
-    button.addEventListener("click", () => this.handleSync(statusEl, button, serverResponseEl, generatedClientManifestEl));
+
+    button.addEventListener("click", () =>
+      this.handleSync(
+        statusEl,
+        button,
+        serverResponseEl,
+        generatedClientManifestEl
+      )
+    );
   }
 
-  async handleSync(statusEl: HTMLElement, button: HTMLElement, serverResponseEl: HTMLElement, generatedClientManifestEl: HTMLElement) {
+  async handleSync(
+    statusEl: HTMLElement,
+    button: HTMLElement,
+    serverResponseEl: HTMLElement,
+    generatedClientManifestEl: HTMLElement
+  ) {
     // Start updater
     this.startStatusUpdate(statusEl, button);
 
@@ -132,21 +146,29 @@ class SyncModal extends Modal {
 
       // Get all markdown files with frontmatter quartz-sync=true
       const files = this.app.vault.getFiles().filter((file) => {
-        const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+        const frontmatter =
+          this.app.metadataCache.getFileCache(file)?.frontmatter;
         return frontmatter && frontmatter["quartz-sync"] === "true";
       });
-      generatedClientManifestEl.innerText = `Files to sync: \n ${files.map((file) => file.path).join("\n")}`;
+      generatedClientManifestEl.innerText = `Files to sync: \n ${files
+        .map((file) => file.path)
+        .join("\n")}`;
 
       // Build manifest
       const manifest: Manifest = await Promise.all(
         files.map(async (file) => {
           generatedClientManifestEl.innerText += `\n Building manifest for ${file.path}`;
-          const fileReadable = this.app.vault.getAbstractFileByPath(file.path)!;
-          generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
+          const fileReadable = this.app.vault.getAbstractFileByPath(file.path);
+          generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(
+            fileReadable,
+            { depth: 2, colors: true }
+          )}`;
           if (!fileReadable || fileReadable instanceof TFile === false) {
             throw new Error(`File ${file.path} could not be read`);
           }
-          generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(fileReadable as TFile)}`;
+          generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(
+            fileReadable as TFile
+          )}`;
           return {
             path: file.path,
             hash: this.hashContent(
@@ -156,7 +178,9 @@ class SyncModal extends Modal {
         })
       );
       state = "manifest-built";
-      generatedClientManifestEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(manifest)}`;
+      generatedClientManifestEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(
+        manifest
+      )}`;
 
       // Send manifest
       const response = await fetch(
@@ -165,8 +189,8 @@ class SyncModal extends Modal {
           method: "POST",
           mode: "cors",
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            Accept: "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({ manifest }),
         }
@@ -225,7 +249,12 @@ class SyncModal extends Modal {
               }),
             }
           );
-          serverResponseEl.innerText = serverResponseEl.innerText + "\n" + session.id + ": \n" + JSON.stringify(await response.json());
+          serverResponseEl.innerText =
+            serverResponseEl.innerText +
+            "\n" +
+            session.id +
+            ": \n" +
+            JSON.stringify(await response.json());
 
           // Validate response
           if (response.status !== 200) {
@@ -245,7 +274,7 @@ class SyncModal extends Modal {
       );
       state = "results-received";
     } catch (e) {
-      error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`; 
+      error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
       state = "error";
     }
   }
