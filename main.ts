@@ -131,18 +131,21 @@ class SyncModal extends Modal {
 
       // Get all markdown files with frontmatter quartz-sync=true
       const files = this.app.vault.getFiles().filter((file) => {
-        const frontmatter =
-          this.app.metadataCache.getFileCache(file)?.frontmatter;
+        const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
         return frontmatter && frontmatter["quartz-sync"] === "true";
       });
+      generatedClientManifestEl.innerText = `Files to sync: \n ${files.map((file) => file.path).join("\n")}`;
 
       // Build manifest
       const manifest: Manifest = await Promise.all(
         files.map(async (file) => {
+          generatedClientManifestEl.innerText += `\n Building manifest for ${file.path}`;
           const fileReadable = this.app.vault.getAbstractFileByPath(file.path)!;
-          if (fileReadable instanceof TFile === false) {
+          generatedClientManifestEl.innerText += `\n FileReadable: \n ${JSON.stringify(fileReadable)}`;
+          if (!fileReadable || fileReadable instanceof TFile === false) {
             throw new Error(`File ${file.path} could not be read`);
           }
+          generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(fileReadable as TFile)}`;
           return {
             path: file.path,
             hash: this.hashContent(
