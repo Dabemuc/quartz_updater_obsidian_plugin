@@ -142,21 +142,23 @@ class SyncModal extends Modal {
       // Build manifest
       const manifest: Manifest = await Promise.all(
         files.map(async (file) => {
-          generatedClientManifestEl.innerText += `\n Building manifest for ${file.path}`;
+          const fullPath = join(__dirname, file.path);
+          generatedClientManifestEl.innerText += `\n Building manifest for ${fullPath}`;
           // const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
           // generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
           // if (!fileReadable || fileReadable instanceof TFile === false) {
           //   throw new Error(`File ${file.path} could not be read`);
           // }
           // generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(fileReadable as TFile)}`;
-          const content = readFileSync(join(__dirname, file.path), 'utf-8');
+          const content = readFileSync(fullPath, 'utf-8').toString();
           generatedClientManifestEl.innerText += `\n File content: \n ${content}`;
+          const hash = this.hashContent(content);
           return {
             path: file.path,
-            hash: this.hashContent(
+            hash: hash,
+            // hash: this.hashContent(
               // await this.app.vault.read(fileReadable as TFile)
-              content
-            ),
+            // ),
           };
         })
       );
