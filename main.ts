@@ -18,9 +18,6 @@ import {
   updateBatchRequestBody,
   updateSession,
 } from "./types";
-import { inspect } from "util";
-import * as path from 'path';
-import * as fs from 'fs';
 
 interface MyPluginSettings {
   backendUrl: string;
@@ -106,18 +103,30 @@ class SyncModal extends Modal {
     div.createEl("p", {
       text: "This will attempt to sync all files marked with the quartz-sync=true frontmatter to the configured quartz_updater backend.",
     });
-    const button = div.createEl("button", { text: "Start sync"});
+    const button = div.createEl("button", { text: "Start sync" });
     div.createEl("h3", { text: "Sync status:" });
     const statusEl = div.createEl("p", { text: state });
     div.createEl("h3", { text: "Client manifest generated:" });
     const generatedClientManifestEl = div.createEl("p", { text: "..." });
     div.createEl("h3", { text: "Server response:" });
     const serverResponseEl = div.createEl("p", { text: "..." });
-    
-    button.addEventListener("click", () => this.handleSync(statusEl, button, serverResponseEl, generatedClientManifestEl));
+
+    button.addEventListener("click", () =>
+      this.handleSync(
+        statusEl,
+        button,
+        serverResponseEl,
+        generatedClientManifestEl
+      )
+    );
   }
 
-  async handleSync(statusEl: HTMLElement, button: HTMLElement, serverResponseEl: HTMLElement, generatedClientManifestEl: HTMLElement) {
+  async handleSync(
+    statusEl: HTMLElement,
+    button: HTMLElement,
+    serverResponseEl: HTMLElement,
+    generatedClientManifestEl: HTMLElement
+  ) {
     // Start updater
     this.startStatusUpdate(statusEl, button);
 
@@ -133,36 +142,28 @@ class SyncModal extends Modal {
       }
 
       // Get all markdown files with frontmatter quartz-sync=true
-      const files = this.app.vault.getFiles().filter((file) => {
-        const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      const files: TFile[] = this.app.vault.getFiles().filter((file) => {
+        const frontmatter =
+          this.app.metadataCache.getFileCache(file)?.frontmatter;
         return frontmatter && frontmatter["quartz-sync"] === "true";
       });
-      generatedClientManifestEl.innerText = `Files to sync: \n ${files.map((file) => file.path).join("\n")}`;
 
       // Build manifest
-      const manifest: Manifest = files.map((file) => {
-          const fullPath = path.join(this.app.vault.getRoot().path, file.path);
-          generatedClientManifestEl.innerText += `\n Building manifest for ${fullPath}`;
-          // const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
-          // generatedClientManifestEl.innerText += `\n FileReadable: \n ${inspect(fileReadable, { depth: 2 , colors: true})}`;
-          // if (!fileReadable || fileReadable instanceof TFile === false) {
-          //   throw new Error(`File ${file.path} could not be read`);
-          // }
-          // generatedClientManifestEl.innerText += `\n File content: \n ${await this.app.vault.read(fileReadable as TFile)}`;
-          const content = fs.readFileSync(fullPath, 'utf-8').toString();
-          generatedClientManifestEl.innerText += `\n File content: \n ${content}`;
+      const manifest: Manifest = await Promise.all(
+        files.map(async (file: TFile) => {
+          const content = await this.app.vault.read(file);
+          generatedClientManifestEl.innerText += `\n Content of ${file.path}: \n ${content}`;
           const hash = this.hashContent(content);
           return {
             path: file.path,
             hash: hash,
-            // hash: this.hashContent(
-              // await this.app.vault.read(fileReadable as TFile)
-            // ),
           };
-        }
+        })
       );
       state = "manifest-built";
-      generatedClientManifestEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(manifest)}`;
+      generatedClientManifestEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(
+        manifest
+      )}`;
 
       // Send manifest
       const response = await fetch(
@@ -171,8 +172,8 @@ class SyncModal extends Modal {
           method: "POST",
           mode: "cors",
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            Accept: "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({ manifest }),
         }
@@ -231,7 +232,12 @@ class SyncModal extends Modal {
               }),
             }
           );
-          serverResponseEl.innerText = serverResponseEl.innerText + "\n" + session.id + ": \n" + JSON.stringify(await response.json());
+          serverResponseEl.innerText =
+            serverResponseEl.innerText +
+            "\n" +
+            session.id +
+            ": \n" +
+            JSON.stringify(await response.json());
 
           // Validate response
           if (response.status !== 200) {
@@ -251,7 +257,7 @@ class SyncModal extends Modal {
       );
       state = "results-received";
     } catch (e: any) {
-      error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`; 
+      error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
       state = "error";
     }
   }
