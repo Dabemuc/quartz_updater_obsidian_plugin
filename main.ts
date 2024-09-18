@@ -130,6 +130,8 @@ class SyncModal extends Modal {
       }
 
       // Get all markdown files with frontmatter quartz-sync=true
+      generatedClientManifestEl.innerText = "All files found by getMarkdownFiles: \n" + this.app.vault.getMarkdownFiles().map((file) => file.path).join("\n");
+      generatedClientManifestEl.innerText = "All files found by getFiles\n" + this.app.vault.getFiles().map((file) => file.path).join("\n");
       const files = this.app.vault.getMarkdownFiles().filter((file) => {
         const frontmatter =
           this.app.metadataCache.getFileCache(file)?.frontmatter;
