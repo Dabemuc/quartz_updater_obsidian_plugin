@@ -140,8 +140,7 @@ class SyncModal extends Modal {
       generatedClientManifestEl.innerText = `Files to sync: \n ${files.map((file) => file.path).join("\n")}`;
 
       // Build manifest
-      const manifest: Manifest = await Promise.all(
-        files.map(async (file) => {
+      const manifest: Manifest = files.map((file) => {
           const fullPath = join(__dirname, file.path);
           generatedClientManifestEl.innerText += `\n Building manifest for ${fullPath}`;
           // const fileReadable = this.app.vault.getAbstractFileByPath(join(__dirname, file.path));
@@ -160,7 +159,7 @@ class SyncModal extends Modal {
               // await this.app.vault.read(fileReadable as TFile)
             // ),
           };
-        })
+        }
       );
       state = "manifest-built";
       generatedClientManifestEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(manifest)}`;
