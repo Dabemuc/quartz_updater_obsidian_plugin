@@ -21,6 +21,7 @@
     "typescript": "4.7.4"
   },
   "dependencies": {
-    "crypto": "^1.0.1"
+    "crypto": "^1.0.1",
+    "sha1-uint8array": "^0.10.7"
   }
 }

@@ -7,9 +7,9 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  TFile,
+  TFile, 
+  Platform
 } from "obsidian";
-import { createHash } from "crypto";
 import {
   Manifest,
   requestUpdateRequestBody,
@@ -18,6 +18,8 @@ import {
   updateBatchRequestBody,
   updateSession,
 } from "./types";
+import { createHash } from 'crypto';
+import { createHash as uintCreateHash } from "sha1-uint8array";
 
 interface MyPluginSettings {
   backendUrl: string;
@@ -263,8 +265,13 @@ class SyncModal extends Modal {
   }
 
   // Helper function to calculate the hash of file content
-  hashContent = (content: string): string =>
-    createHash("sha256").update(content).digest("hex");
+  hashContent(content: string): string {
+    if (Platform.isMobileApp){
+        return uintCreateHash().update(content).digest("hex");
+    } else {
+        return createHash('sha1').update(content).digest('hex');
+    }   
+  }
 
   async startStatusUpdate(statusEl: HTMLElement, button: HTMLElement) {
     const interval = setInterval(() => {
