@@ -19,12 +19,10 @@ import {
   updateSession,
 } from "types";
 
-// TODO
 interface MyPluginSettings {
   backendUrl: string;
 }
 
-// TODO
 const DEFAULT_SETTINGS: MyPluginSettings = {
   backendUrl: "",
 };
@@ -35,7 +33,6 @@ export default class MyPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    // TODO use to open modal with sync button and then sync status
     // This creates an icon in the left ribbon.
     const ribbonIconEl = this.addRibbonIcon(
       "folder-sync",
@@ -48,9 +45,8 @@ export default class MyPlugin extends Plugin {
 
     // TODO: Use for styling?
     // Perform additional things with the ribbon
-    ribbonIconEl.addClass("my-plugin-ribbon-class");
+    //ribbonIconEl.addClass("my-plugin-ribbon-class");
 
-    // TODO: Same as left ribbon icon
     // This adds a simple command that can be triggered anywhere
     this.addCommand({
       id: "open-quartz-sync-modal",
@@ -90,7 +86,6 @@ type SyncState =
 let state: SyncState = "not-started";
 let error: string = "";
 let results: string = "";
-let serverResponse: string = "";
 
 class SyncModal extends Modal {
   settings: MyPluginSettings;
@@ -110,15 +105,18 @@ class SyncModal extends Modal {
     });
     const button = div.createEl("button", { text: "Start sync"});
     div.createEl("h3", { text: "Sync status:" });
-    const status = div.createEl("p", { text: state });
-    const serverResponseEl = div.createEl("p", { text: serverResponse });
+    const statusEl = div.createEl("p", { text: state });
+    div.createEl("h3", { text: "Client manifest generated:" });
+    const generatedClientManifestEl = div.createEl("p", { text: "..." });
+    div.createEl("h3", { text: "Server response:" });
+    const serverResponseEl = div.createEl("p", { text: "..." });
     
-    button.addEventListener("click", () => this.handleSync(status, button, serverResponseEl));
+    button.addEventListener("click", () => this.handleSync(statusEl, button, serverResponseEl, generatedClientManifestEl));
   }
 
-  async handleSync(status: HTMLElement, button: HTMLElement, serverResponseEl: HTMLElement) {
+  async handleSync(statusEl: HTMLElement, button: HTMLElement, serverResponseEl: HTMLElement, generatedClientManifestEl: HTMLElement) {
     // Start updater
-    this.startStatusUpdate(status, button);
+    this.startStatusUpdate(statusEl, button);
 
     // Start sync
     error = "";
@@ -135,8 +133,10 @@ class SyncModal extends Modal {
       const files = this.app.vault.getMarkdownFiles().filter((file) => {
         const frontmatter =
           this.app.metadataCache.getFileCache(file)?.frontmatter;
+        generatedClientManifestEl.innerText = `\n Frontmatter for File ${file.path}: \n ${JSON.stringify(frontmatter)}`;
         return frontmatter && frontmatter["quartz-sync"] === true;
       });
+      generatedClientManifestEl.innerText = `\n Files to sync: \n ${files.map((file) => file.path).join("\n")}`;
 
       // Build manifest
       const manifest: Manifest = await Promise.all(
@@ -154,6 +154,7 @@ class SyncModal extends Modal {
         })
       );
       state = "manifest-built";
+      generatedClientManifestEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(manifest)}`;
 
       // Send manifest
       const response = await fetch(
@@ -287,6 +288,9 @@ class SyncModal extends Modal {
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
+    state = "not-started";
+    error = "";
+    results = "";
   }
 }
 
