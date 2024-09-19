@@ -7,8 +7,8 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  TFile, 
-  Platform
+  TFile,
+  Platform,
 } from "obsidian";
 import {
   Manifest,
@@ -18,7 +18,7 @@ import {
   updateBatchRequestBody,
   updateSession,
 } from "./types";
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 import { createHash as uintCreateHash } from "sha1-uint8array";
 
 interface MyPluginSettings {
@@ -129,13 +129,13 @@ class SyncModal extends Modal {
     serverResponseEl: HTMLElement,
     generatedClientManifestEl: HTMLElement
   ) {
-    // Start updater
-    this.startStatusUpdate(statusEl, button);
-
     // Start sync
     error = "";
     results = "";
     state = "started";
+    statusEl.innerText = "Building manifest...";
+    button.setAttribute("disabled", "true");
+    button.innerText = "Syncing...";
 
     try {
       // Validate settings
@@ -154,8 +154,8 @@ class SyncModal extends Modal {
       const manifest: Manifest = await Promise.all(
         files.map(async (file: TFile) => {
           const content = await this.app.vault.read(file);
-          generatedClientManifestEl.innerText += `\n Content of ${file.path}: \n ${content}`;
           const hash = this.hashContent(content);
+          generatedClientManifestEl.innerText += `\n Manifest build for ${file.path}`;
           return {
             path: file.path,
             hash: hash,
@@ -168,6 +168,7 @@ class SyncModal extends Modal {
       )}`;
 
       // Send manifest
+      statusEl.innerText = "Sending manifest...";
       const response = await fetch(
         this.settings.backendUrl + "/request-update",
         {
@@ -183,8 +184,9 @@ class SyncModal extends Modal {
       state = "manifest-sent";
 
       // Wait for update sessions
+      statusEl.innerText = "Waiting for update sessions";
       const responseJson = await response.json();
-      serverResponseEl.innerText = JSON.stringify(response);
+      serverResponseEl.innerText = JSON.stringify(responseJson);
 
       // Validate response
       if (response.status !== 200) {
@@ -200,6 +202,7 @@ class SyncModal extends Modal {
       state = "update-sessions-received";
 
       // Send updates
+      statusEl.innerText = "Sending updates";
       serverResponseEl.innerText = "";
       await Promise.all(
         updateSessions.map(async (session) => {
@@ -208,7 +211,7 @@ class SyncModal extends Modal {
             session.permittedChanges.map(async (change) => {
               const fileReadable = this.app.vault.getAbstractFileByPath(
                 change.path
-              )!;
+              )!; //TODO hier problem
               if (fileReadable instanceof TFile === false) {
                 throw new Error(`File ${change.path} could not be read`);
               }
@@ -258,7 +261,15 @@ class SyncModal extends Modal {
         })
       );
       state = "results-received";
+      statusEl.innerText = results;
+      statusEl.style.color = "green";
+      button.removeAttribute("disabled");
+      button.innerText = "Restart sync";
     } catch (e: any) {
+      statusEl.innerText = error;
+      statusEl.style.color = "red";
+      button.removeAttribute("disabled");
+      button.innerText = "Restart sync";
       error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
       state = "error";
     }
@@ -266,44 +277,11 @@ class SyncModal extends Modal {
 
   // Helper function to calculate the hash of file content
   hashContent(content: string): string {
-    if (Platform.isMobileApp){
-        return uintCreateHash().update(content).digest("hex");
+    if (Platform.isMobileApp) {
+      return uintCreateHash().update(content).digest("hex");
     } else {
-        return createHash('sha1').update(content).digest('hex');
-    }   
-  }
-
-  async startStatusUpdate(statusEl: HTMLElement, button: HTMLElement) {
-    const interval = setInterval(() => {
-      statusEl.innerText = state;
-      switch (state) {
-        case "started":
-          statusEl.innerText = "Sending manifest";
-          button.setAttribute("disabled", "true");
-          button.innerText = "Syncing...";
-          break;
-        case "manifest-sent":
-          statusEl.innerText = "Waiting for update sessions";
-          break;
-        case "update-sessions-received":
-          statusEl.innerText = results;
-          break;
-        case "results-received":
-          statusEl.innerText = results;
-          statusEl.style.color = "green";
-          clearInterval(interval);
-          button.removeAttribute("disabled");
-          button.innerText = "Restart sync";
-          break;
-        case "error":
-          statusEl.innerText = error;
-          statusEl.style.color = "red";
-          clearInterval(interval);
-          button.removeAttribute("disabled");
-          button.innerText = "Restart sync";
-          break;
-      }
-    }, 1000);
+      return createHash("sha1").update(content).digest("hex");
+    }
   }
 
   onClose() {
