@@ -84,6 +84,8 @@ class SyncModal extends Modal {
     this.settings = settings;
   }
 
+  defaultColor: string;
+
   onOpen() {
     const { contentEl } = this;
     // create main div with class for styling
@@ -101,15 +103,14 @@ class SyncModal extends Modal {
     button.addEventListener("click", () =>
       this.handleSync(button, outputLogEl)
     );
+
+    this.defaultColor = outputLogEl.style.color;
   }
 
-  async handleSync(
-    button: HTMLElement,
-    outputLogEl: HTMLElement
-  ) {
+  async handleSync(button: HTMLElement, outputLogEl: HTMLElement) {
     // Start sync
     outputLogEl.innerText = "";
-    outputLogEl.style.color = "black";
+    outputLogEl.style.color = this.defaultColor;
     button.setAttribute("disabled", "true");
     button.innerText = "Syncing...";
 
@@ -198,7 +199,7 @@ class SyncModal extends Modal {
               }
               const fileReadable = this.app.vault.getAbstractFileByPath(
                 change.path
-              )!; 
+              )!;
               if (fileReadable instanceof TFile === false) {
                 throw new Error(`File ${change.path} could not be read`);
               }
@@ -209,9 +210,7 @@ class SyncModal extends Modal {
               };
             })
           );
-          outputLogEl.innerText += `\nUpdates generated for session ${
-            session.id
-          }: \n
+          outputLogEl.innerText += `\nUpdates generated for ${session.id}: \n
             ${JSON.stringify(
               updates.map((update) => ({
                 path: update.path,
@@ -220,7 +219,7 @@ class SyncModal extends Modal {
             )}`;
 
           // Send updates
-          outputLogEl.innerText += `\nSending updates for session ${session.id}`;
+          outputLogEl.innerText += `\nSending updates for ${session.id}`;
           const response = await fetch(
             this.settings.backendUrl + "/update-batch",
             {
@@ -237,7 +236,7 @@ class SyncModal extends Modal {
 
           // Validate response
           const responseJson = await response.json();
-          outputLogEl.innerText += `Response received for session ${
+          outputLogEl.innerText += `\nResponse received for ${
             session.id
           }: \n 
             ${JSON.stringify(responseJson)}`;
@@ -257,12 +256,12 @@ class SyncModal extends Modal {
           });
         })
       );
-      outputLogEl.innerText += "Sync complete";
+      outputLogEl.innerText += "\n\nSync complete";
       outputLogEl.style.color = "green";
       button.removeAttribute("disabled");
       button.innerText = "Restart sync";
     } catch (e: any) {
-      outputLogEl.innerText += `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
+      outputLogEl.innerText += `\n\nMessage: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
       outputLogEl.style.color = "red";
       button.removeAttribute("disabled");
       button.innerText = "Restart sync";
