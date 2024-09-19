@@ -256,6 +256,21 @@ class SyncModal extends Modal {
           });
         })
       );
+
+      // Call rebuild-quartz endpoint
+      outputLogEl.innerText += "\nRebuilding quartz";
+      const responseRebuildQuartz = await fetch(this.settings.backendUrl + "/rebuild-quartz", {
+        method: "POST",
+      });
+      if (responseRebuildQuartz.status !== 200) {
+        throw new Error(
+          "An Error occurred while rebuilding quartz: " + responseRebuildQuartz.status
+        );
+      } else {
+        outputLogEl.innerText += `\nQuartz rebuilt successfully`;
+      }
+
+      // Sync complete
       outputLogEl.innerText += "\n\nSync complete";
       outputLogEl.style.color = "green";
       button.removeAttribute("disabled");
