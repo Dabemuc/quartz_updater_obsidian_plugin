@@ -76,19 +76,6 @@ export default class MyPlugin extends Plugin {
   }
 }
 
-type SyncState =
-  | "not-started"
-  | "started"
-  | "manifest-built"
-  | "manifest-sent"
-  | "update-sessions-received"
-  | "results-received"
-  | "error";
-
-let state: SyncState = "not-started";
-let error: string = "";
-let results: string = "";
-
 class SyncModal extends Modal {
   settings: MyPluginSettings;
 
@@ -107,33 +94,26 @@ class SyncModal extends Modal {
     });
     const button = div.createEl("button", { text: "Start sync" });
     div.createEl("h3", { text: "Sync status:" });
-    const statusEl = div.createEl("p", { text: state });
+    const statusEl = div.createEl("p", { text: "Not started yet" });
     div.createEl("h3", { text: "Client manifest generated:" });
-    const generatedClientManifestEl = div.createEl("p", { text: "..." });
-    div.createEl("h3", { text: "Server response:" });
-    const serverResponseEl = div.createEl("p", { text: "..." });
+    const outputLogEl = div.createEl("p", {
+      text: "Waiting for sync to start",
+    });
 
     button.addEventListener("click", () =>
-      this.handleSync(
-        statusEl,
-        button,
-        serverResponseEl,
-        generatedClientManifestEl
-      )
+      this.handleSync(statusEl, button, outputLogEl)
     );
   }
 
   async handleSync(
     statusEl: HTMLElement,
     button: HTMLElement,
-    serverResponseEl: HTMLElement,
-    generatedClientManifestEl: HTMLElement
+    outputLogEl: HTMLElement
   ) {
     // Start sync
-    error = "";
-    results = "";
-    state = "started";
     statusEl.innerText = "Building manifest...";
+    statusEl.style.color = "black";
+    outputLogEl.innerText = "";
     button.setAttribute("disabled", "true");
     button.innerText = "Syncing...";
 
@@ -155,15 +135,14 @@ class SyncModal extends Modal {
         files.map(async (file: TFile) => {
           const content = await this.app.vault.read(file);
           const hash = this.hashContent(content);
-          generatedClientManifestEl.innerText += `\n Manifest build for ${file.path}`;
+          outputLogEl.innerText += `\n Manifest built for ${file.path}`;
           return {
             path: file.path,
             hash: hash,
           };
         })
       );
-      state = "manifest-built";
-      generatedClientManifestEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(
+      outputLogEl.innerText += `\n Generated Manifest: \n ${JSON.stringify(
         manifest
       )}`;
 
@@ -181,12 +160,14 @@ class SyncModal extends Modal {
           body: JSON.stringify({ manifest }),
         }
       );
-      state = "manifest-sent";
+      outputLogEl.innerText += `\nManifest sent`;
 
       // Wait for update sessions
       statusEl.innerText = "Waiting for update sessions";
       const responseJson = await response.json();
-      serverResponseEl.innerText = JSON.stringify(responseJson);
+      outputLogEl.innerText += `\nReceived response${JSON.stringify(
+        responseJson
+      )}`;
 
       // Validate response
       if (response.status !== 200) {
@@ -199,19 +180,27 @@ class SyncModal extends Modal {
       if (!Array.isArray(updateSessions)) {
         throw new Error("Update sessions not found in response body");
       }
-      state = "update-sessions-received";
+      outputLogEl.innerText += `\n Response validated`;
 
       // Send updates
       statusEl.innerText = "Sending updates";
-      serverResponseEl.innerText = "";
       await Promise.all(
         updateSessions.map(async (session) => {
+          outputLogEl.innerText += `\nBuilding updates for session ${session.id}`;
           // Generate updates
           const updates: Update[] = await Promise.all(
             session.permittedChanges.map(async (change) => {
+              outputLogEl.innerText += `\nBuilding update for ${change.path} (${change.type})`;
+              if (change.type === "delete") {
+                return {
+                  type: change.type,
+                  path: change.path,
+                  content: "",
+                };
+              }
               const fileReadable = this.app.vault.getAbstractFileByPath(
                 change.path
-              )!; //TODO hier problem
+              )!; 
               if (fileReadable instanceof TFile === false) {
                 throw new Error(`File ${change.path} could not be read`);
               }
@@ -222,8 +211,18 @@ class SyncModal extends Modal {
               };
             })
           );
+          outputLogEl.innerText += `\nUpdates generated for session ${
+            session.id
+          }: \n
+            ${JSON.stringify(
+              updates.map((update) => ({
+                path: update.path,
+                content: update.content.slice(0, 10) + "...",
+              }))
+            )}`;
 
           // Send updates
+          outputLogEl.innerText += `\nSending updates for session ${session.id}`;
           const response = await fetch(
             this.settings.backendUrl + "/update-batch",
             {
@@ -237,18 +236,18 @@ class SyncModal extends Modal {
               }),
             }
           );
-          serverResponseEl.innerText =
-            serverResponseEl.innerText +
-            "\n" +
-            session.id +
-            ": \n" +
-            JSON.stringify(await response.json());
 
           // Validate response
-          if (response.status !== 200) {
-            throw new Error("An Error occurred while sending updates");
-          }
           const responseJson = await response.json();
+          outputLogEl.innerText += `Response received for session ${
+            session.id
+          }: \n 
+            ${JSON.stringify(responseJson)}`;
+          if (response.status !== 200) {
+            throw new Error(
+              "An Error occurred while sending updates: " + response.status
+            );
+          }
           const sessionResult = responseJson.body;
           if (!Array.isArray(sessionResult)) {
             throw new Error("Invalid response body");
@@ -256,22 +255,19 @@ class SyncModal extends Modal {
 
           // Update results
           sessionResult.forEach((result) => {
-            results += `${result.path}: ${result.status}\n`;
+            outputLogEl.innerText += `\n${result.path}: ${result.status}`;
           });
         })
       );
-      state = "results-received";
-      statusEl.innerText = results;
+      statusEl.innerText = "Sync complete";
       statusEl.style.color = "green";
       button.removeAttribute("disabled");
       button.innerText = "Restart sync";
     } catch (e: any) {
-      statusEl.innerText = error;
+      statusEl.innerText = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
       statusEl.style.color = "red";
       button.removeAttribute("disabled");
       button.innerText = "Restart sync";
-      error = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
-      state = "error";
     }
   }
 
@@ -287,9 +283,6 @@ class SyncModal extends Modal {
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
-    state = "not-started";
-    error = "";
-    results = "";
   }
 }
 
