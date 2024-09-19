@@ -93,27 +93,23 @@ class SyncModal extends Modal {
       text: "This will attempt to sync all files marked with the quartz-sync=true frontmatter to the configured quartz_updater backend.",
     });
     const button = div.createEl("button", { text: "Start sync" });
-    div.createEl("h3", { text: "Sync status:" });
-    const statusEl = div.createEl("p", { text: "Not started yet" });
-    div.createEl("h3", { text: "Client manifest generated:" });
+    div.createEl("h3", { text: "Output:" });
     const outputLogEl = div.createEl("p", {
       text: "Waiting for sync to start",
     });
 
     button.addEventListener("click", () =>
-      this.handleSync(statusEl, button, outputLogEl)
+      this.handleSync(button, outputLogEl)
     );
   }
 
   async handleSync(
-    statusEl: HTMLElement,
     button: HTMLElement,
     outputLogEl: HTMLElement
   ) {
     // Start sync
-    statusEl.innerText = "Building manifest...";
-    statusEl.style.color = "black";
     outputLogEl.innerText = "";
+    outputLogEl.style.color = "black";
     button.setAttribute("disabled", "true");
     button.innerText = "Syncing...";
 
@@ -122,6 +118,7 @@ class SyncModal extends Modal {
       if (!this.settings.backendUrl || this.settings.backendUrl === "") {
         throw new Error("Backend URL is not set");
       }
+      outputLogEl.innerText += `\nBackend URL: ${this.settings.backendUrl}`;
 
       // Get all markdown files with frontmatter quartz-sync=true
       const files: TFile[] = this.app.vault.getFiles().filter((file) => {
@@ -131,6 +128,7 @@ class SyncModal extends Modal {
       });
 
       // Build manifest
+      outputLogEl.innerText += `\nBuilding manifest for ${files.length} files`;
       const manifest: Manifest = await Promise.all(
         files.map(async (file: TFile) => {
           const content = await this.app.vault.read(file);
@@ -147,7 +145,7 @@ class SyncModal extends Modal {
       )}`;
 
       // Send manifest
-      statusEl.innerText = "Sending manifest...";
+      outputLogEl.innerText += "\nSending manifest";
       const response = await fetch(
         this.settings.backendUrl + "/request-update",
         {
@@ -163,7 +161,7 @@ class SyncModal extends Modal {
       outputLogEl.innerText += `\nManifest sent`;
 
       // Wait for update sessions
-      statusEl.innerText = "Waiting for update sessions";
+      outputLogEl.innerText += "\nWaiting for update sessions";
       const responseJson = await response.json();
       outputLogEl.innerText += `\nReceived response${JSON.stringify(
         responseJson
@@ -180,13 +178,13 @@ class SyncModal extends Modal {
       if (!Array.isArray(updateSessions)) {
         throw new Error("Update sessions not found in response body");
       }
-      outputLogEl.innerText += `\n Response validated`;
+      outputLogEl.innerText += `\nResponse validated`;
 
       // Send updates
-      statusEl.innerText = "Sending updates";
+      outputLogEl.innerText += "\nSending updates";
       await Promise.all(
         updateSessions.map(async (session) => {
-          outputLogEl.innerText += `\nBuilding updates for session ${session.id}`;
+          outputLogEl.innerText += `\nBuilding updates for ${session.id}`;
           // Generate updates
           const updates: Update[] = await Promise.all(
             session.permittedChanges.map(async (change) => {
@@ -248,7 +246,7 @@ class SyncModal extends Modal {
               "An Error occurred while sending updates: " + response.status
             );
           }
-          const sessionResult = responseJson.body;
+          const sessionResult = responseJson;
           if (!Array.isArray(sessionResult)) {
             throw new Error("Invalid response body");
           }
@@ -259,13 +257,13 @@ class SyncModal extends Modal {
           });
         })
       );
-      statusEl.innerText = "Sync complete";
-      statusEl.style.color = "green";
+      outputLogEl.innerText += "Sync complete";
+      outputLogEl.style.color = "green";
       button.removeAttribute("disabled");
       button.innerText = "Restart sync";
     } catch (e: any) {
-      statusEl.innerText = `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
-      statusEl.style.color = "red";
+      outputLogEl.innerText += `Message: ${e.message} \nStack: ${e.stack} \nError: ${e}`;
+      outputLogEl.style.color = "red";
       button.removeAttribute("disabled");
       button.innerText = "Restart sync";
     }
