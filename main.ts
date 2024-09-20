@@ -264,10 +264,10 @@ class SyncModal extends Modal {
       });
       if (responseRebuildQuartz.status !== 200) {
         throw new Error(
-          "An Error occurred while rebuilding quartz: " + responseRebuildQuartz.status
+          "An Error occurred while rebuilding quartz: " + responseRebuildQuartz.status + "\nResponse: " + await responseRebuildQuartz.text()
         );
       } else {
-        outputLogEl.innerText += `\nQuartz rebuilt successfully`;
+        outputLogEl.innerText += `\nQuartz rebuilt successfully \n  Response: ${await responseRebuildQuartz.text()}`;
       }
 
       // Sync complete
